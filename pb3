@@ -1,0 +1,426 @@
+using System;
+using System.Collections.Generic;
+using System.Collections;
+using System.Linq;
+
+namespace pokerbot2
+{
+
+    public struct Card
+    {
+        public char Suit;
+        public int Rank;
+    }
+    public struct Hand : IComparable<Hand>
+    {
+        public ulong FullBitField;
+        public int SmallBitField;
+        public char[] Suits;
+        public int[] Ranks;
+        public int CompareTo(Hand hand)
+        {
+            int myScore = GetScore();
+            int theirScore = hand.GetScore();
+            if (myScore != theirScore) {
+                return myScore.CompareTo(theirScore);
+            }
+            else
+            {
+                return GetTieBreaker().CompareTo(hand.GetTieBreaker());
+            }
+        }
+        public int GetScore()
+        {
+            if (Enumerable.SequenceEqual(Ranks, new int[] { 14, 2, 3, 4, 5 }))
+            {
+                //Console.WriteLine("Straight");
+                return 5;
+
+            }
+
+            int score = 0;
+            decimal cardType = FullBitField % 15;
+            switch (cardType)
+            {
+                case 1:
+                    score = 8;
+                    //Console.WriteLine("Four of a Kind");
+                    break;
+                case 10:
+                    score = 7;
+                    //Console.WriteLine("Full House");
+                    break;
+                case 9:
+                    score = 4;
+                    //Console.WriteLine("Three of a Kind");
+                    break;
+                case 7:
+                    score = 3;
+                    //Console.WriteLine("Two Pairs");
+                    break;
+                case 6:
+                    score = 2;
+                    //Console.WriteLine("One Pair");
+                    break;
+                case 5:
+                    score = 1;
+                    //Console.WriteLine("High Card");
+                    break;
+                default:
+                    break;
+            }
+            if (IsStraight() && Suits.Distinct().Count() == 1)
+            {
+                //Console.WriteLine("Straight Flush");
+                score = 9;
+            }
+            else if (IsStraight())
+            {
+                //Console.WriteLine("Straight");
+                score = 5;
+
+            }
+            else if (Suits.Distinct().Count() == 1)
+            {
+                //Console.WriteLine("Flush");
+                score = 6;
+                if (Enumerable.SequenceEqual(Ranks, new int[] { 10, 11, 12, 13, 14 }))
+                {
+                    Console.WriteLine("Royal Flush");
+                    score = 10;
+                }
+
+
+            }
+            return score;
+        }
+        public  decimal GetTieBreaker()
+        {
+            Array.Sort(Ranks);
+            Array.Reverse(Ranks);
+
+            int tiebreaker = Ranks[0] << 16 | Ranks[1] << 12 | Ranks[2] << 8 | Ranks[3] << 4 | Ranks[4] << 0;
+            return tiebreaker;
+        }
+        public  bool IsStraight()
+        {
+            int lsb = SmallBitField & -SmallBitField;
+            int normalized = SmallBitField / lsb;
+            return normalized == 31;
+
+        }
+
+    }
+    /*public class Hand : IComparable<Hand>
+    {
+        public int Score;
+        public decimal TieBreaker;
+        public static bool IsStraight(int s)
+        {
+            int lsb = s & -s;
+            int normalized = s / lsb;
+            return normalized == 31;
+            
+        }
+        public static decimal GetTieBreaker(int[] ranks)
+        {
+            Array.Sort(ranks);
+            Array.Reverse(ranks);
+
+            int tiebreaker = ranks[0] << 16 |  ranks[1] << 12 | ranks[2] << 8 | ranks[3] << 4 | ranks[4] << 0;
+            return tiebreaker;
+        }
+        
+
+        public static int GetScore(int s, ulong v, int[] ranks, string[] suits)
+        {
+            if (Enumerable.SequenceEqual(ranks,new int[] {14,2,3,4,5 })){
+                //Console.WriteLine("Straight");
+                return 5;
+                
+            }
+
+            int score = 0;
+            decimal cardType = v % 15;
+            switch (cardType)
+            {
+                case 1:
+                    score = 8;
+                    //Console.WriteLine("Four of a Kind");
+                    break;
+                case 10:
+                    score = 7;
+                    //Console.WriteLine("Full House");
+                    break;
+                case 9:
+                    score = 4;
+                    //Console.WriteLine("Three of a Kind");
+                    break;
+                case 7:
+                    score = 3;
+                    //Console.WriteLine("Two Pairs");
+                    break;
+                case 6:
+                    score = 2;
+                    //Console.WriteLine("One Pair");
+                    break;
+                case 5:
+                    score = 1;
+                    //Console.WriteLine("High Card");
+                    break;
+                default:
+                    break;
+            }
+            if (IsStraight(s) && suits.Distinct().Count() == 1)
+            {
+                //Console.WriteLine("Straight Flush");
+                score = 9;
+            }
+            else if (IsStraight(s))
+            {
+                //Console.WriteLine("Straight");
+                score = 5;
+
+            }
+            else if (suits.Distinct().Count() == 1)
+            {
+                //Console.WriteLine("Flush");
+                score = 6;
+                if (Enumerable.SequenceEqual(ranks, new int[] { 10, 11, 12, 13, 14 })) {
+                    Console.WriteLine("Royal Flush");
+                    score = 10;
+                }
+                
+
+            }
+            return score;
+        }
+        public Hand(int[] ranks, string[] suits)
+        {
+            int s = 1 << ranks[0] | 1 << ranks[1] | 1 << ranks[2] | 1 << ranks[3] | 1 << ranks[4];
+            ulong v = 0;
+            Dictionary<int, int> instances = new Dictionary<int, int>();
+            for (int i = 0; i < 5; i++)
+            {
+                int offset = 0;
+                int rank = ranks[i];
+                if ((s & 1 << rank) > 0)
+                {
+                    if (!instances.ContainsKey(rank))
+                    {
+                        instances.Add(rank, 1);
+                    }
+                    else
+                    {
+                        instances[rank] = instances[rank] + 1;
+                    }
+                    offset = instances[rank];
+                }
+                ulong addition = (ulong)Math.Pow(2, rank * 4);
+                addition = addition << offset;
+                v = v | addition;
+
+            }
+            v = v >> 1;
+            Score = GetScore(s, v, ranks, suits);
+            TieBreaker = GetTieBreaker(ranks);
+
+
+        }
+        public int CompareTo(Hand hand)
+        {
+            if (Score.CompareTo(hand.Score) != 0)
+            {
+                return Score.CompareTo(hand.Score);
+            }
+            return TieBreaker.CompareTo(hand.TieBreaker);
+        }
+    }*/
+    class Program
+    {
+
+        public static List<Card> AllCards = new List<Card>();
+        public static List<Card> MyCards = new List<Card> { new Card { Suit = 's', Rank = 2 }, new Card { Suit = 's', Rank = 3 } };
+        public static List<Card> TableCards = new List<Card>{ new Card { Suit = 'h', Rank = 2 }, new Card { Suit = 'h', Rank = 5 }, new Card { Suit = 'c', Rank = 12 } };
+
+        public static float Odds;
+
+        public static void GenerateDeck()
+        {
+            char[] suitOptions = new char[] { 's', 'h', 'c', 'd' };
+            int[] rankOptions = Enumerable.Range(1, 13).ToArray();
+            foreach (var rank in rankOptions)
+            {
+                foreach (var suit in suitOptions)
+                {
+                    Card foo = new Card { Rank = rank+1, Suit = suit };
+                    if (!AllCards.Contains(foo))
+                    {
+                        AllCards.Add(foo);
+                    }
+
+                }
+            }
+            Console.WriteLine(AllCards.Count());
+        }
+        /*public static List<Card> GetAvailableCards(List<Card> villainCards)
+        {
+            List<Card> result = AllCards.Except(MyCards).Except(TableCards).Except(villainCards).ToList();
+            /*foreach (Card card in AllCards)
+            {
+                if (!MyCards.Contains(card) && !TableCards.Contains(card) && !villainCards.Contains(card))
+                {
+                    availCards.Add(card);
+                }
+            }*/
+            
+        //}
+        public static IEnumerable<List<Card>> CardCombos(IEnumerable<Card> cards, int count)
+        {
+            int i = 0;
+            foreach (Card card in cards)
+            {
+                if (count == 1)
+                {
+                    yield return new List<Card>() { card };
+                }
+
+                else
+                {
+                    foreach (var result in CardCombos(cards.Skip(i + 1), count - 1))
+                    {
+
+                        yield return new List<Card>(result) { card };
+                    }
+                    //yield return new Card[] { card }.Concat(result);
+                }
+
+                ++i;
+            }
+        }
+        public static Hand ParseAsHand( List<Card> cardList)
+        {
+            int[] ranks = cardList.Select(card => card.Rank).ToArray();
+            char[] suits = cardList.Select(card => card.Suit).ToArray();
+            int s = 1 << ranks[0] | 1 << ranks[1] | 1 << ranks[2] | 1 << ranks[3] | 1 << ranks[4];
+            ulong v = 0;
+            Dictionary<int, int> instances = new Dictionary<int, int>();
+            for (int i = 0; i < 5; i++)
+            {
+                int offset = 0;
+                int rank = ranks[i];
+                if ((s & 1 << rank) > 0)
+                {
+                    if (!instances.ContainsKey(rank))
+                    {
+                        instances.Add(rank, 1);
+                    }
+                    else
+                    {
+                        instances[rank] = instances[rank] + 1;
+                    }
+                    offset = instances[rank];
+                }
+                ulong addition = (ulong)Math.Pow(2, rank * 4);
+                addition = addition << offset;
+                v = v | addition;
+
+            }
+            v = v >> 1;
+            return new Hand { FullBitField = v, SmallBitField = s, Ranks = ranks, Suits = suits };
+            //return new Hand(ranks, suits);
+        }
+        public static  Hand HandToPlay(List<Card> holeCards, List<Card> cardsOnTable) {
+            HashSet<List<Card>> handsToPlay = new HashSet<List<Card>>();
+            for (int i = 0; i < 2; i++)
+            {
+                for (int j = 0; j < 2; j++)
+                {
+                    List<Card> myHand = new List<Card>(cardsOnTable.GetRange(i, 4));
+                    myHand.Add(holeCards[j]);
+                    handsToPlay.Add(myHand);
+                    /*if (!handsToPlay.Contains(ParseAsHand(myHand)))
+                    {
+                        handsToPlay.Add(ParseAsHand(myHand));
+                    }*/
+
+                }
+              
+            }
+            foreach (var startingCardSet in CardCombos(cardsOnTable, 3))
+            {
+                List<Card> myHand = new List<Card>(startingCardSet);
+                myHand.AddRange(holeCards);
+                handsToPlay.Add(myHand);
+                   
+                /*if (!handsToPlay.Contains(ParseAsHand(myHand)))
+                {
+                    handsToPlay.Add(ParseAsHand(myHand));
+                }*/
+            }
+            List<Hand> handList = new List<Hand>();
+            foreach (List<Card> cardList in handsToPlay)
+            {
+                handList.Add(ParseAsHand(cardList));
+            }
+            return handList.Max();
+        }
+       
+        public static void GetOdds()
+        {
+            float heroWins = 0; //if player wins
+            float villainWins = 0; //if opponent wins
+            float villainCardSets = 0;
+            IEnumerable<Card> availCards = AllCards.Except(MyCards).Except(TableCards); //all cards left in the deck (original deck with my hole cards and community cards subtracted)
+            foreach (var villainCardSet in CardCombos(availCards, 2)) //every combination of cards our opponent may have
+            {
+                /*Console.WriteLine($"vcset n {villainCardSets} ");
+                villainCardSets++;*/
+                List<List<Card>> validHands = new List<List<Card>>(); //all 5-card sets that may potentially appear on the table
+                foreach (var cardSet in CardCombos(availCards.Except(villainCardSet), 5 - TableCards.Count)) //all combinations of cards that may be added to the existing table
+                {
+                    List<Card> currentHand = new List<Card>(TableCards); //making the potential 5-card set
+                    foreach (var card in cardSet)
+                    {
+                        currentHand.Add(card); //add the combination to the 5-card set
+                    }
+                    validHands.Add(currentHand); 
+
+
+                }
+                
+                foreach (List<Card> hand in validHands) 
+                {
+                    Hand villainHand = HandToPlay(villainCardSet, hand);
+                    Hand heroHand = HandToPlay(MyCards, hand);
+                    switch (heroHand.CompareTo(villainHand))
+                    {
+                        case 1:
+                            heroWins++;
+                            break;
+                        case -1:
+                            villainWins++;
+                            break;
+                        case 0:
+                            heroWins += 0.5f;
+                            villainWins += 0.5f;
+                            break;
+                    }
+                    
+                }
+
+            }
+            Odds = heroWins / (heroWins + villainWins);
+
+        }
+
+        static void Main(string[] args)
+        {
+            GenerateDeck();
+            
+            GetOdds();
+            Console.WriteLine(Odds);
+           
+        }
+    }
+}
